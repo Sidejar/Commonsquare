@@ -7,6 +7,8 @@ import { CSButton } from "@/components/cs/cs-button";
 import { CSBadge } from "@/components/cs/cs-badge";
 import { TopicVotePanel } from "@/components/topics/topic-vote-panel";
 import { TopicComments } from "@/components/topics/topic-comments";
+import { DebateCard } from "@/components/debates/debate-ui";
+import { getTopicDebatesServer } from "@/lib/debates-server";
 import {
   getTopicBySlugServer,
   getTopicCommentsServer,
@@ -236,10 +238,11 @@ export default async function TopicPage({ params }: PageProps) {
     notFound();
   }
 
-  // Parallel fetch tally + initial comments.
-  const [tally, initialComments] = await Promise.all([
+  // Parallel fetch tally + initial comments + open debates on this topic.
+  const [tally, initialComments, topicDebates] = await Promise.all([
     getTopicVoteTallyServer(topic.id),
     getTopicCommentsServer(topic.id, "top"),
+    getTopicDebatesServer(topic.id),
   ]);
 
   const leftSources = (topic.left_sources as unknown as TopicSource[]) ?? [];
@@ -401,6 +404,51 @@ export default async function TopicPage({ params }: PageProps) {
               sources={rightSources}
             />
           </div>
+        </section>
+
+        {/* Debates on this topic — open debates only; closed ones never
+            leave their two debaters' lists. */}
+        <section className="mt-16">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <h3
+              className="font-sans"
+              style={{
+                margin: 0,
+                fontWeight: 500,
+                fontSize: "clamp(22px, 3vw, 28px)",
+                letterSpacing: "-0.025em",
+                color: CS.ink,
+              }}
+            >
+              Debates on this topic
+            </h3>
+            <Link href={`/debates/new?topic=${topic.slug}`}>
+              <CSButton variant="primary" size="sm">
+                Debate this topic →
+              </CSButton>
+            </Link>
+          </div>
+          {topicDebates.length === 0 ? (
+            <p
+              className="font-sans px-6 py-8"
+              style={{
+                margin: 0,
+                border: `1px dashed ${CS.rule2}`,
+                borderRadius: 14,
+                fontSize: 14,
+                color: CS.ink,
+              }}
+            >
+              Nobody has debated this one yet. Pick a side and issue the
+              first challenge.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {topicDebates.map((d) => (
+                <DebateCard key={d.id} debate={d} />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Comments (client island — interactivity + signup gate) */}

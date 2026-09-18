@@ -33,6 +33,17 @@ export function LandingNav() {
         >
           Topics
         </Link>
+        <Link
+          href="/debates"
+          className="font-sans"
+          style={{
+            fontSize: 14,
+            color: CS.ink,
+            letterSpacing: "-0.01em",
+          }}
+        >
+          Debates
+        </Link>
         {["Why", "Compass", "Square"].map((l) => (
           <a
             key={l}
