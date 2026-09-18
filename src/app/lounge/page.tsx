@@ -10,6 +10,7 @@ import { CSProcAvatar } from "@/components/cs/cs-proc-avatar";
 import { CSButton } from "@/components/cs/cs-button";
 import { BadgePill } from "@/components/badges/badge-pill";
 import { TodayTopicTile } from "@/components/lounge/today-topic-tile";
+import { XpTile } from "@/components/lounge/xp-tile";
 import { useOnboardingState } from "@/lib/onboarding-state";
 import { useSession } from "@/lib/use-session";
 import { getSupabase } from "@/lib/supabase";
@@ -627,6 +628,11 @@ export default function LoungePage() {
             {/* Today's Topic tile */}
             <div className="mt-7 md:mt-10">
               <TodayTopicTile userId={profile.user_id} />
+            </div>
+
+            {/* Total XP tile */}
+            <div className="mt-4">
+              <XpTile userId={profile.user_id} xp={profile.xp} />
             </div>
 
             {/* Mobile tab strip */}
