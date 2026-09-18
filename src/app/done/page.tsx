@@ -283,7 +283,7 @@ export default function DonePage() {
           >
             We&rsquo;ll email{" "}
             <span style={{ color: CS.violetD, fontWeight: 500 }}>
-              {session.user.email ?? profile.email}
+              {session.user.email}
             </span>{" "}
             the moment the square opens for matchmaking. Until then, hang
             out in your Lounge — watch debates as they go live, vote on the

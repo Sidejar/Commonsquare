@@ -201,7 +201,6 @@ export default function ResultsPage() {
       if (existing) {
         await insertProfile({
           userId: session.user.id,
-          email: session.user.email ?? existing.email,
           handle: existing.handle,
           axisE: axes.e,
           axisS: axes.s,

@@ -4,14 +4,20 @@ import { getSupabase } from "./supabase";
 import type { ArchetypeId } from "./archetypes";
 import type { Database } from "./database.types";
 
-export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+// Clients can't read profiles.email (column grant, migration
+// profiles_hide_email), so `select("*")` is denied: select these columns
+// instead. The signed-in user's own email is session.user.email.
+const PROFILE_COLUMNS =
+  "user_id, handle, axis_e, axis_s, axis_g, archetype_id, show_on_profile, elo, wins, losses, created_at, updated_at, xp";
+
+export type ProfileRow = Omit<Database["public"]["Tables"]["profiles"]["Row"], "email">;
 
 // Lookup the current user's profile. Returns null if no row exists yet.
 export async function fetchMyProfile(userId: string): Promise<ProfileRow | null> {
   const sb = getSupabase();
   const { data, error } = await sb
     .from("profiles")
-    .select("*")
+    .select(PROFILE_COLUMNS)
     .eq("user_id", userId)
     .maybeSingle();
   if (error) throw error;
@@ -25,7 +31,7 @@ export async function fetchProfileByHandle(handle: string): Promise<ProfileRow |
   const sb = getSupabase();
   const { data, error } = await sb
     .from("profiles")
-    .select("*")
+    .select(PROFILE_COLUMNS)
     .eq("handle", handle.toLowerCase())
     .maybeSingle();
   if (error) throw error;
@@ -42,9 +48,10 @@ export async function isHandleAvailable(handle: string): Promise<boolean> {
   return Boolean(data);
 }
 
+// No email: the DB fills profiles.email from the JWT (migration
+// profiles_email_from_jwt) and clients can't write it.
 export interface NewProfileInput {
   userId: string;
-  email: string;
   handle: string;
   axisE: number;
   axisS: number;
@@ -63,7 +70,6 @@ export async function insertProfile(input: NewProfileInput): Promise<ProfileRow>
     .upsert(
       {
         user_id: input.userId,
-        email: input.email,
         handle: input.handle,
         axis_e: input.axisE,
         axis_s: input.axisS,
@@ -73,7 +79,7 @@ export async function insertProfile(input: NewProfileInput): Promise<ProfileRow>
       },
       { onConflict: "user_id" },
     )
-    .select()
+    .select(PROFILE_COLUMNS)
     .single();
   if (error) throw error;
   return data;

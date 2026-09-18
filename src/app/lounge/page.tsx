@@ -770,7 +770,7 @@ export default function LoungePage() {
                   className="font-sans"
                   style={{ fontSize: 16, color: CS.ink, fontWeight: 500 }}
                 >
-                  {session.user.email ?? profile.email}
+                  {session.user.email}
                 </span>
                 <button
                   type="button"

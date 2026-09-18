@@ -143,7 +143,6 @@ export default function UsernamePage() {
       const archetype = pickArchetype(axes);
       await insertProfile({
         userId: session.user.id,
-        email: session.user.email ?? "",
         handle,
         axisE: axes.e,
         axisS: axes.s,
