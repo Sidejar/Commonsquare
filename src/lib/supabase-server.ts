@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { noStoreFetch } from "./supabase-anon-server";
 
 // Server-only Supabase client using the SERVICE ROLE key. Bypasses RLS.
 // NEVER import this from a "use client" file. NEVER expose the env var via
@@ -21,6 +22,7 @@ export function getServiceRoleClient(): SupabaseClient<Database> {
   }
   _admin = createClient<Database>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: noStoreFetch },
   });
   return _admin;
 }

@@ -41,7 +41,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let topicEntries: MetadataRoute.Sitemap = [];
   try {
-    const sb = createAnonServerClient();
+    const sb = createAnonServerClient(revalidate);
     const { data, error } = await sb
       .from("topics")
       .select("slug, published_at, updated_at")
