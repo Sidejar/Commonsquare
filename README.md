@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CommonSquare
 
-## Getting Started
+A civic debate platform. Every day there is one **Topic of the Day**: a neutral briefing on a news story, how left- and right-leaning outlets are covering it, and a single Yes/No question anyone can vote on and discuss. Members take a political-compass quiz, get an archetype, and can challenge each other to structured, cross-spectrum debates.
 
-First, run the development server:
+Live at [commonsquare.app](https://commonsquare.app). How the product works — surfaces, debate rules, XP, data model, decisions — is in [docs/product-architecture.md](docs/product-architecture.md). Read that first.
+
+## Stack
+
+Next.js 14 (App Router) · TypeScript · Tailwind · Supabase (Postgres, Auth, RLS, pg_cron, Edge Functions) · Vercel · Anthropic API.
+
+## Run it
 
 ```bash
+npm install
+cp .env.example .env.local   # fill in the Supabase values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Layout
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Path | What |
+|---|---|
+| `src/app` | Pages and API routes (`/topics`, `/debates`, `/lounge`, `/quiz`, `/admin/*`, `/api/*`) |
+| `src/lib` | Supabase clients, fetchers, quiz/archetype logic, `database.types.ts` |
+| `src/components` | `cs/*` design-system primitives, feature components |
+| `supabase/migrations` | SQL applied to the CommonSquare Supabase project |
+| `supabase/functions/daily-topic` | Edge function that writes the Topic of the Day |
+| `docs` | Product architecture, design brief, compass spec, landing copy |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Topic of the Day automation
 
-## Learn More
+A Supabase cron job calls the `daily-topic` edge function every morning (10:00 UTC). It reads the day's headlines from 22 left / center / right RSS feeds, has Claude pick one story covered across the spectrum and write the briefing and the Yes/No question, and publishes it. Details and operating notes: [docs/product-architecture.md §11](docs/product-architecture.md).
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Admin console: `/admin/topics/auto` (run log, run now, draft, feed test). Manual topics: `/admin/topics/new`.
+- One-time setup: `supabase secrets set ANTHROPIC_API_KEY=... --project-ref fyhjusydcmbcsisflmao`
+- Deploy the function: `supabase functions deploy daily-topic --project-ref fyhjusydcmbcsisflmao --no-verify-jwt --use-api`
+- Test its logic: `node --experimental-strip-types supabase/functions/daily-topic/lib.test.ts`

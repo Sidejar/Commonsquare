@@ -1,6 +1,6 @@
 # CommonSquare — Product Architecture
 
-**Last updated:** 2026-05-13
+**Last updated:** 2026-09-17
 **Status:** Living doc. Update whenever a core mechanic changes.
 
 This is the source of truth for **how the product works**. It captures decisions made across the design handoff, build sessions, and conversations to date. If something here contradicts older docs, this wins.
@@ -25,7 +25,7 @@ A **topic** is a *place* about a subject. Permanent. Read by anyone. The SEO and
 - A list of debates that have been tied to this topic *(to build, post-debate-engine)*
 
 **Created by:**
-- Daily automated AI workflow via n8n *(to build)*
+- Daily automated AI workflow — Supabase pg_cron → `daily-topic` edge function *(built, see §11)*
 - Admin manual entry via `/admin/topics/new` *(built)*
 
 **Lives at:** `/topics/[slug]` (built), index at `/topics` (built).
@@ -44,9 +44,9 @@ A **debate** is a *match* between two specific people. Bounded. Has rounds, dead
 - Audience comments *(open debates only, to build)*
 
 **Created by:**
-- A user issuing a challenge *(to build)*
+- A user issuing a challenge at `/debates/new` *(built)*
 
-**Lives at:** `/debates/[id]` *(to build)*.
+**Lives at:** `/debates/[id]`, index at `/debates` *(built)*.
 
 ### The relationship
 
@@ -253,7 +253,7 @@ comment_votes (upvote/downvote on comments)
   unique(comment_id, user_id)
 ```
 
-### Future build (debate engine)
+### Debate engine *(debates + rounds built 2026-09-17; the rest is future)*
 
 ```
 debates
@@ -309,7 +309,7 @@ xp_events (v1 — append-only ledger of XP grants)
 | Frontend | Next.js 14 (App Router) + TypeScript + Tailwind |
 | Auth + DB | Supabase (Postgres + Auth + RLS) |
 | Hosting | Vercel |
-| Daily topic automation | n8n (Sidejar instance) + Anthropic API |
+| Daily topic automation | Supabase pg_cron + pg_net → `daily-topic` edge function (RSS feeds + Anthropic API) |
 | AI judging *(future)* | Anthropic API (Claude Sonnet, structured output) |
 | Social distribution *(future)* | n8n → X / IG / LinkedIn |
 | OG images *(future)* | Vercel OG (`@vercel/og`) |
@@ -331,12 +331,16 @@ xp_events (v1 — append-only ledger of XP grants)
 - ✅ Today's Topic tile on the lounge
 - ✅ Today's Topic preview section on the landing
 - ✅ Production domain (`commonsquare.app`) live on Vercel
+- ✅ Topic comments — threaded, with up/down votes and sort tabs
+- ✅ **Automated Topic of the Day** — Supabase cron + `daily-topic` edge function, admin console at `/admin/topics/auto` (§11) *(2026-09-17)*
+- ✅ **Debate engine v1** — `debates` + `rounds`, all writes through SECURITY DEFINER RPCs (`create_challenge`, `accept_challenge`, `decline_challenge`, `cancel_challenge`, `submit_round`), read RPC `debates_with_debaters`; turn order A1 B1 A2 B2 A3 B3 with 12h per turn; pg_cron `debate-forfeit-sweep` every 10 min; +10 XP each on completion; 5 direct challenges per 24h, 10 queued max; open challenges sorted most-opposite-first on the topic's axis. Pages: `/debates`, `/debates/new`, `/debates/[id]`, plus "Debates on this topic" on topic pages *(2026-09-17)*
+- ✅ **XP ledger** — `xp_events` + `profiles.xp`, granted by DB triggers: +1 vote (once per topic), +1 comment (once per topic), +5 first activity of the UTC day; "Total XP" tile on the lounge *(2026-09-17)*
 
 **Build queue (rough priority):**
-1. **Topic comments** — threaded discussion under each topic. Highest engagement-multiplier per hour of build.
-2. **n8n daily topic flow** — Anthropic API + NewsData.io → POST to `/api/topics`. Workflow JSON delivered, Peter wires in his Sidejar n8n instance.
-3. **XP ledger + event tracking** — append-only `xp_events` table, helper functions, "Total XP" tile on lounge.
-4. **Debate engine v1** — schema, challenge flow, matchmaking (anyone + specific), round submission with 12h deadlines, debate viewer page, "no judging yet" status.
+1. ~~Topic comments~~ — shipped.
+2. ~~n8n daily topic flow~~ — **shipped 2026-09-17** as a Supabase cron + edge function instead (§11). `/api/topics` + `TOPICS_INGEST_TOKEN` still work for any external ingest.
+3. ~~XP ledger + event tracking~~ — **shipped 2026-09-17**. Still to add: streak scaling and first-time bonuses.
+4. ~~Debate engine v1~~ — **shipped 2026-09-17**. Not built yet: block / mute, audience comments on open debates, notifications (your turn, new challenge), judging, Elo, tiers.
 5. **Lounge feed** — turn the lounge into the Reddit-style mixed feed (tabs: For You / Live Now / Today's Topic / Open Debates).
 6. **OG image template + social distribution** — Vercel OG for shareable cards, n8n posts daily topic to socials.
 7. **Tiers + audience voting + AI judging** — v1.5 once we have user data.
@@ -361,3 +365,29 @@ Decisions captured here so we don't relitigate them.
 | 2026-05-13 | Direct-to-main git workflow during MVP | Speed; reverts to PR flow once real users are onboard |
 | 2026-05-13 | Quiz items adapted from Pew 2021 + MFQ + WVS + ANES | Defensibility vs ad-hoc items |
 | 2026-05-13 | 22 questions, 8/7/7 across Economic/Social/Governance | Coverage + Stressed-Sideliner discriminators |
+| 2026-09-17 | Daily topic runs on Supabase cron + edge function, not n8n | One less system to run; schedule, secret, and run log all live next to the data |
+| 2026-09-17 | Free RSS feeds instead of NewsData.io | No API key, and every source carries a known outlet → bias label |
+| 2026-09-17 | Claude returns headline ids, never URLs | Source links on a topic are always real feed items, bucketed by the outlet's AllSides rating |
+
+---
+
+## 11. Daily Topic automation (the daily poll)
+
+The Topic of the Day **is** the daily poll: a `topics` row with its Yes/No `debate_question`, voted on through `topic_votes`. The landing page, lounge tile, and `/topics` all show the most recently published topic, so publishing a row is all it takes.
+
+**Flow**
+
+1. `pg_cron` job `daily-topic` fires at **10:00 UTC** (6am ET); `daily-topic-retry` fires at 12:00 UTC and is a no-op if a topic went out in the last 20h.
+2. Both call `public.trigger_daily_topic()`, which uses `pg_net` to POST to the `daily-topic` edge function with the `x-cron-secret` header. The secret is generated inside Postgres and lives in Supabase Vault (`cron_secret`); the function checks it via `public.get_cron_secret()` (service-role only).
+3. The function (`supabase/functions/daily-topic/`) pulls ~165 fresh headlines from 22 RSS feeds labelled Left / Lean Left / Center / Lean Right / Right (list + labels in `lib.ts`, AllSides ratings). A dead feed is skipped, never fatal.
+4. Claude (`claude-opus-5`, structured JSON output) picks one story covered on both sides that supports a real Yes/No question, and writes the title, question, neutral background, left/right framing summaries, tags, and `primary_axis`. It is shown recent topics so it doesn't repeat them. It returns **headline ids only**; the code maps them back to real feed items and buckets them by the outlet's bias, and refuses to publish without at least one left and one right source.
+5. The row is inserted as `published` with slug `<story>-YYYY-MM-DD`. Every run (published / skipped / failed / dry_run) is logged to `public.topic_ingest_runs`.
+
+**Operating it**
+
+- Admin console: `/admin/topics/auto` — run log, "Generate & publish now", "Generate as draft", "Test feeds only".
+- SQL: `select public.trigger_daily_topic('{"force": true, "background": true}');`
+- Requires the edge function secret `ANTHROPIC_API_KEY` (`supabase secrets set ANTHROPIC_API_KEY=... --project-ref fyhjusydcmbcsisflmao`).
+- Deploy: `supabase functions deploy daily-topic --project-ref fyhjusydcmbcsisflmao --no-verify-jwt --use-api`.
+- Tests for the parsing/row-building logic: `node --experimental-strip-types supabase/functions/daily-topic/lib.test.ts`.
+- Change the time: `select cron.alter_job((select jobid from cron.job where jobname = 'daily-topic'), schedule := '0 11 * * *');`
