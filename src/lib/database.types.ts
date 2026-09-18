@@ -49,6 +49,74 @@ export type Database = {
           },
         ];
       };
+      debates: {
+        Row: {
+          challenged_user_id: string | null;
+          completed_at: string | null;
+          created_at: string;
+          current_round: number;
+          custom_prompt: string | null;
+          debater_a_stance: string;
+          debater_a_user_id: string;
+          debater_b_stance: string | null;
+          debater_b_user_id: string | null;
+          id: string;
+          opponent_selection: string;
+          status: string;
+          topic_id: string | null;
+          turn_deadline_at: string | null;
+          turn_user_id: string | null;
+          updated_at: string;
+          visibility: string;
+        };
+        Insert: {
+          challenged_user_id?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          current_round?: number;
+          custom_prompt?: string | null;
+          debater_a_stance: string;
+          debater_a_user_id: string;
+          debater_b_stance?: never;
+          debater_b_user_id?: string | null;
+          id?: string;
+          opponent_selection: string;
+          status?: string;
+          topic_id?: string | null;
+          turn_deadline_at?: string | null;
+          turn_user_id?: string | null;
+          updated_at?: string;
+          visibility?: string;
+        };
+        Update: {
+          challenged_user_id?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          current_round?: number;
+          custom_prompt?: string | null;
+          debater_a_stance?: string;
+          debater_a_user_id?: string;
+          debater_b_stance?: never;
+          debater_b_user_id?: string | null;
+          id?: string;
+          opponent_selection?: string;
+          status?: string;
+          topic_id?: string | null;
+          turn_deadline_at?: string | null;
+          turn_user_id?: string | null;
+          updated_at?: string;
+          visibility?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "debates_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           archetype_id: string;
@@ -64,6 +132,7 @@ export type Database = {
           updated_at: string;
           user_id: string;
           wins: number;
+          xp: number;
         };
         Insert: {
           archetype_id: string;
@@ -72,13 +141,14 @@ export type Database = {
           axis_s: number;
           created_at?: string;
           elo?: number;
-          email: string;
+          email?: string;
           handle: string;
           losses?: number;
           show_on_profile?: boolean;
           updated_at?: string;
           user_id: string;
           wins?: number;
+          xp?: number;
         };
         Update: {
           archetype_id?: string;
@@ -94,8 +164,47 @@ export type Database = {
           updated_at?: string;
           user_id?: string;
           wins?: number;
+          xp?: number;
         };
         Relationships: [];
+      };
+      rounds: {
+        Row: {
+          content: string;
+          deadline_at: string;
+          debate_id: string;
+          id: string;
+          round_number: number;
+          submitted_at: string;
+          user_id: string;
+        };
+        Insert: {
+          content: string;
+          deadline_at: string;
+          debate_id: string;
+          id?: string;
+          round_number: number;
+          submitted_at?: string;
+          user_id: string;
+        };
+        Update: {
+          content?: string;
+          deadline_at?: string;
+          debate_id?: string;
+          id?: string;
+          round_number?: number;
+          submitted_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "rounds_debate_id_fkey";
+            columns: ["debate_id"];
+            isOneToOne: false;
+            referencedRelation: "debates";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       topic_comments: {
         Row: {
@@ -211,6 +320,38 @@ export type Database = {
         };
         Relationships: [];
       };
+      topic_ingest_runs: {
+        Row: {
+          created_at: string;
+          detail: Json;
+          id: string;
+          status: string;
+          topic_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          detail?: Json;
+          id?: string;
+          status: string;
+          topic_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          detail?: Json;
+          id?: string;
+          status?: string;
+          topic_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "topic_ingest_runs_topic_id_fkey";
+            columns: ["topic_id"];
+            isOneToOne: false;
+            referencedRelation: "topics";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       topic_votes: {
         Row: {
           archetype_id: string;
@@ -249,11 +390,98 @@ export type Database = {
           },
         ];
       };
+      xp_events: {
+        Row: {
+          action: string;
+          amount: number;
+          created_at: string;
+          day: string;
+          id: string;
+          reference_id: string | null;
+          reference_type: string | null;
+          user_id: string;
+        };
+        Insert: {
+          action: string;
+          amount: number;
+          created_at?: string;
+          day?: string;
+          id?: string;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          user_id: string;
+        };
+        Update: {
+          action?: string;
+          amount?: number;
+          created_at?: string;
+          day?: string;
+          id?: string;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
+      accept_challenge: { Args: { p_debate_id: string }; Returns: undefined };
+      cancel_challenge: { Args: { p_debate_id: string }; Returns: undefined };
+      create_challenge: {
+        Args: {
+          p_custom_prompt?: string | null;
+          p_opponent_handle?: string | null;
+          p_stance: string;
+          p_topic_id?: string | null;
+          p_visibility?: string;
+        };
+        Returns: string;
+      };
+      debate_is_listed: {
+        Args: { d: Database["public"]["Tables"]["debates"]["Row"] };
+        Returns: boolean;
+      };
+      debates_with_debaters: {
+        Args: {
+          p_debate_id?: string | null;
+          p_limit?: number;
+          p_scope?: string;
+          p_topic_id?: string | null;
+        };
+        Returns: {
+          a_archetype_id: string | null;
+          a_handle: string;
+          b_archetype_id: string | null;
+          b_handle: string | null;
+          challenged_user_id: string | null;
+          completed_at: string | null;
+          created_at: string;
+          current_round: number;
+          debater_a_stance: string;
+          debater_a_user_id: string;
+          debater_b_stance: string;
+          debater_b_user_id: string | null;
+          id: string;
+          opponent_selection: string;
+          prompt: string;
+          status: string;
+          topic_id: string | null;
+          topic_slug: string | null;
+          topic_title: string | null;
+          turn_deadline_at: string | null;
+          turn_user_id: string | null;
+          updated_at: string;
+          visibility: string;
+        }[];
+      };
+      decline_challenge: { Args: { p_debate_id: string }; Returns: undefined };
       handle_is_available: { Args: { p_handle: string }; Returns: boolean };
       handle_is_clean: { Args: { p_handle: string }; Returns: boolean };
+      submit_round: {
+        Args: { p_content: string; p_debate_id: string };
+        Returns: undefined;
+      };
       topic_comments_with_author: {
         Args: { p_limit?: number; p_sort?: string; p_topic_id: string };
         Returns: {
@@ -277,6 +505,7 @@ export type Database = {
           yes_total: number;
         }[];
       };
+      trigger_daily_topic: { Args: { p_body?: Json }; Returns: number };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
@@ -289,6 +518,9 @@ export type TopicVoteTally =
   Database["public"]["Functions"]["topic_vote_tally"]["Returns"][number];
 export type CommentWithAuthor =
   Database["public"]["Functions"]["topic_comments_with_author"]["Returns"][number];
+export type DebateWithDebaters =
+  Database["public"]["Functions"]["debates_with_debaters"]["Returns"][number];
+export type RoundRow = Database["public"]["Tables"]["rounds"]["Row"];
 
 // Shape of a source citation inside a topic's left_sources / right_sources /
 // center_sources jsonb arrays. n8n writes these via the ingest endpoint; the

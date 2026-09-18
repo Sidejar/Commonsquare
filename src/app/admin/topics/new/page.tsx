@@ -8,7 +8,7 @@ import { CSMark } from "@/components/cs/cs-mark";
 import { CSButton } from "@/components/cs/cs-button";
 import { CSBadge } from "@/components/cs/cs-badge";
 import { useSession } from "@/lib/use-session";
-import { isAdminEmail } from "@/lib/admin";
+import { useIsAdmin } from "@/lib/use-admin";
 import type { TopicSource } from "@/lib/database.types";
 
 type Bias = TopicSource["bias_label"];
@@ -195,6 +195,7 @@ function SourceFields({
 export default function NewTopicPage() {
   const router = useRouter();
   const { session, loading } = useSession();
+  const isAdmin = useIsAdmin(session);
 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -228,10 +229,10 @@ export default function NewTopicPage() {
       router.replace("/signup");
       return;
     }
-    if (!isAdminEmail(session.user.email)) {
+    if (isAdmin === false) {
       router.replace("/lounge");
     }
-  }, [loading, session, router]);
+  }, [loading, session, isAdmin, router]);
 
   useEffect(() => {
     if (!slugManuallyEdited) setSlug(slugify(title));
@@ -292,7 +293,7 @@ export default function NewTopicPage() {
 
   if (loading) return null;
   if (!session) return null;
-  if (!isAdminEmail(session.user.email)) return null;
+  if (!isAdmin) return null;
 
   return (
     <main className="min-h-screen" style={{ background: CS.paper }}>
